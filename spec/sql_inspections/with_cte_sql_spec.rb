@@ -92,4 +92,66 @@ RSpec.describe "Active Record WITH CTE tables" do
       expect(query).to match_regex(with_recursive_personal_query)
     end
   end
+
+  context "when chaining the materialized method" do
+    let(:with_materialized_personal_query) do
+      /WITH.+personal_id_one.+AS MATERIALIZED \(SELECT.+users.+FROM.+WHERE.+users.+personal_id.+ = 1\)/
+    end
+
+    let(:with_materialized) do
+      User.with
+          .materialized(personal_id_one: User.where(personal_id: 1))
+          .joins("JOIN personal_id_one ON personal_id_one.id = users.id")
+          .to_sql
+    end
+
+    it "generates an expression with materialized" do
+      query = User.with
+                  .materialized(personal_id_one: User.where(personal_id: 1))
+                  .joins("JOIN personal_id_one ON personal_id_one.id = users.id")
+                  .to_sql
+
+      expect(query).to match_regex(with_materialized_personal_query)
+    end
+
+    it "will maintain the CTE table when merging" do
+      sub_query = User.with.materialized(personal_id_one: User.where(personal_id: 1))
+      query     = User.merge(sub_query)
+                      .joins("JOIN personal_id_one ON personal_id_one.id = users.id")
+                      .to_sql
+
+      expect(query).to match_regex(with_materialized_personal_query)
+    end
+  end
+
+  context "when chaining the not_materialized method" do
+    let(:with_not_materialized_personal_query) do
+      /WITH.+personal_id_one.+AS NOT MATERIALIZED \(SELECT.+users.+FROM.+WHERE.+users.+personal_id.+ = 1\)/
+    end
+
+    let(:with_not_materialized) do
+      User.with
+          .not_materialized(personal_id_one: User.where(personal_id: 1))
+          .joins("JOIN personal_id_one ON personal_id_one.id = users.id")
+          .to_sql
+    end
+
+    it "generates an expression with not_materialized" do
+      query = User.with
+                  .not_materialized(personal_id_one: User.where(personal_id: 1))
+                  .joins("JOIN personal_id_one ON personal_id_one.id = users.id")
+                  .to_sql
+
+      expect(query).to match_regex(with_not_materialized_personal_query)
+    end
+
+    it "will maintain the CTE table when merging" do
+      sub_query = User.with.not_materialized(personal_id_one: User.where(personal_id: 1))
+      query     = User.merge(sub_query)
+                      .joins("JOIN personal_id_one ON personal_id_one.id = users.id")
+                      .to_sql
+
+      expect(query).to match_regex(with_not_materialized_personal_query)
+    end
+  end
 end

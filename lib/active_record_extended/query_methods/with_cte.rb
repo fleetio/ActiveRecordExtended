@@ -75,6 +75,22 @@ module ActiveRecordExtended
             scope.cte.pipe_cte_with!(args)
           end
         end
+
+        # @param [Hash, WithCTE] args
+        def materialized(args)
+          @scope.tap do |scope|
+            scope.materialized_value = true
+            scope.cte.pipe_cte_with!(args)
+          end
+        end
+
+        # @param [Hash, WithCTE] args
+        def not_materialized(args)
+          @scope.tap do |scope|
+            scope.not_materialized_value = true
+            scope.cte.pipe_cte_with!(args)
+          end
+        end
       end
 
       # @return [WithCTE]
@@ -111,6 +127,30 @@ module ActiveRecordExtended
         !(!@values[:recursive])
       end
 
+      # @param [Boolean] value
+      def materialized_value=(value)
+        raise ImmutableRelation if @loaded
+
+        @values[:materialized] = value
+      end
+
+      # @return [Boolean]
+      def materialized_value?
+        !(!@values[:materialized])
+      end
+
+      # @param [Boolean] value
+      def not_materialized_value=(value)
+        raise ImmutableRelation if @loaded
+
+        @values[:not_materialized] = value
+      end
+
+      # @return [Boolean]
+      def not_materialized_value?
+        !(!@values[:not_materialized])
+      end
+
       # @param [Hash, WithCTE] opts
       def with(opts = :chain, *rest)
         return WithChain.new(spawn) if opts == :chain
@@ -134,6 +174,10 @@ module ActiveRecordExtended
         cte_statements = cte.map do |name, expression|
           grouped_expression = cte.generate_grouping(expression)
           cte_name           = cte.to_arel_sql(cte.double_quote(name.to_s))
+
+          grouped_expression = Arel::Nodes::SqlLiteral.new("MATERIALIZED #{grouped_expression.to_sql}") if materialized_value?
+          grouped_expression = Arel::Nodes::SqlLiteral.new("NOT MATERIALIZED #{grouped_expression.to_sql}") if not_materialized_value?
+
           Arel::Nodes::As.new(cte_name, grouped_expression)
         end
 
